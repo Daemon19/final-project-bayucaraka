@@ -4,6 +4,8 @@
 #include <rclc/rclc.h>
 #include <rclc/executor.h>
 #include <geometry_msgs/msg/point_stamped.h>
+#include <gantry_interfaces/msg/gantry_status.h>
+#include <gantry_interfaces/msg/gantry_target.h>
 
 #define LED_PIN 2
 
@@ -29,10 +31,10 @@ rcl_allocator_t allocator;
 rclc_support_t support;
 rcl_node_t node;
 
-geometry_msgs__msg__PointStamped target_msg;
+gantry_interfaces__msg__GantryTarget target_msg;
 rcl_subscription_t target_subscriber;
 
-geometry_msgs__msg__PointStamped status_msg;
+gantry_interfaces__msg__GantryStatus status_msg;
 rcl_publisher_t status_publisher;
 rcl_timer_t status_timer;
 
@@ -61,15 +63,15 @@ void move_to_target() {
   const float threshold = 10.0f;
   const float speed = 2.0f;
 
-  float dx = target_msg.point.x - status_msg.point.x;
+  float dx = target_msg.x_cm - status_msg.x_cm;
   if (fabs(dx) > threshold) {
-    status_msg.point.x += (dx > 0) ? speed : -speed;
+    status_msg.x_cm += (dx > 0) ? speed : -speed;
     return;
   }
 
-  float dy = target_msg.point.y - status_msg.point.y;
+  float dy = target_msg.y_cm - status_msg.y_cm;
   if (fabs(dy) > threshold) {
-    status_msg.point.y += (dy > 0) ? speed : -speed;
+    status_msg.y_cm += (dy > 0) ? speed : -speed;
     return;
   }
 
@@ -78,11 +80,6 @@ void move_to_target() {
 
 void setup() {
   gantry_state = IDLE;
-
-  // initialize status message frame_id
-  status_msg.header.frame_id.data = (char *)"base_link";
-  status_msg.header.frame_id.size = strlen(status_msg.header.frame_id.data);
-  status_msg.header.frame_id.capacity = status_msg.header.frame_id.size + 1;
 
   set_microros_transports();
   pinMode(LED_PIN, OUTPUT);
@@ -100,14 +97,14 @@ void setup() {
   RCCHECK(rclc_subscription_init_default(
     &target_subscriber,
     &node,
-    ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, PointStamped),
+    ROSIDL_GET_MSG_TYPE_SUPPORT(gantry_interfaces, msg, GantryTarget),
     "gantry/target"));
 
   // create publisher
   RCCHECK(rclc_publisher_init_default(
     &status_publisher,
     &node,
-    ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, PointStamped),
+    ROSIDL_GET_MSG_TYPE_SUPPORT(gantry_interfaces, msg, GantryStatus),
     "gantry/status"));
 
   // create status timer
