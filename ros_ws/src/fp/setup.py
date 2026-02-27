@@ -1,4 +1,5 @@
 from setuptools import find_packages, setup
+from glob import glob
 
 package_name = "fp"
 
@@ -9,6 +10,7 @@ setup(
     data_files=[
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
+        ("share/" + package_name + "/launch", glob("launch/*.launch.py")),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
@@ -26,6 +28,7 @@ setup(
             "aruco_detection = fp.aruco_detection:main",
             "camera = fp.camera:main",
             "aruco_detector = fp.aruco_detector:main",
+            "pixel_to_ground = fp.pixel_to_ground:main",
         ],
     },
 )

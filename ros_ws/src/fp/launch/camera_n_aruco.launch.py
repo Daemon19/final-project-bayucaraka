@@ -1,32 +1,61 @@
 from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
 def generate_launch_description():
+    camera_index_arg = DeclareLaunchArgument("camera_index", default_value="0")
+    calibration_path_arg = DeclareLaunchArgument(
+        "calibration_path", default_value="camera-calibration.npz"
+    )
+    homography_path_arg = DeclareLaunchArgument(
+        "homography_path", default_value="homography_cm.npy"
+    )
+
     camera_node = Node(
-        package="camera",  # <-- Replace with your package name
-        executable="camera_node",  # <-- Replace with your setup.py entry point
-        name="usb_webcam",
+        package="fp",
+        executable="camera",
+        name="camera",
         output="screen",
         parameters=[
             {
-                "video_device": 2,  # Example param for camera index
-                "framerate": 30.0,
+                "camera_index": LaunchConfiguration("camera_index"),
             }
         ],
     )
 
     aruco_node = Node(
-        package="aruco_detector",  # <-- Replace with your package name
-        executable="aruco_detector",  # <-- Replace with your setup.py entry point
-        name="aruco_processor",
+        package="fp",
+        executable="aruco_detector",
+        name="aruco_detector",
         output="screen",
         parameters=[
             {
-                "image_topic": "/camera/iamge_raw"  # Tell detector where to listen
+                "calibration_path": LaunchConfiguration("calibration_path"),
             }
         ],
     )
 
-    # 4. Return the Launch Description
-    return LaunchDescription([camera_node, aruco_node])
+    pixel_to_ground_node = Node(
+        package="fp",
+        executable="pixel_to_ground",
+        name="pixel_to_ground",
+        output="screen",
+        parameters=[
+            {
+                "homography_path": LaunchConfiguration("homography_path"),
+            }
+        ],
+    )
+
+    return LaunchDescription(
+        [
+            camera_index_arg,
+            calibration_path_arg,
+            homography_path_arg,
+            camera_node,
+            aruco_node,
+            pixel_to_ground_node,
+        ]
+    )

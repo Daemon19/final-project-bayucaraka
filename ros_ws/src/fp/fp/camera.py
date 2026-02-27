@@ -27,7 +27,7 @@ class Camera(Node):
         # self.capture.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))  # type: ignore
         self.bridge = CvBridge()
         self.capture_timer = self.create_timer(self.CAPTURE_PERIOD, self.capture_image)
-        self.get_logger().info("Camera node has been started.")
+        self.get_logger().info(f"Camera initialized with index: {camera_index}")
 
     def capture_image(self):
         ret, frame = self.capture.read()
