@@ -54,7 +54,7 @@ class Perception(Node):
     def load_camera_calibration(self, calibration_path: str) -> None:
         try:
             calibration_data = np.load(calibration_path)
-            camera_matrix = calibration_data["camera-matrix"]
+            camera_matrix = calibration_data["camera_matrix"]
             distortion = calibration_data["distortion"]
             self.get_logger().info(
                 f"Loaded camera calibration from: {calibration_path}"
