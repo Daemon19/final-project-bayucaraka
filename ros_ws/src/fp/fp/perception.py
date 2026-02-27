@@ -18,17 +18,29 @@ class Perception(Node):
         self.declare_parameter("camera_index", 0)
         self.declare_parameter("camera_calibration", "camera-calibration.npz")
         self.declare_parameter("homography_path", "homography_cm.npy")
-        self.declare_parameter("aruco_id", 39)
+        self.declare_parameter("payload_aruco_id", 39)
+        self.declare_parameter("dropping_zone_aruco_id", 26)
 
         camera_index = int(self.get_parameter("camera_index").value)
         camera_calibration = str(self.get_parameter("camera_calibration").value)
         homography_path = Path(str(self.get_parameter("homography_path").value))
-        self.aruco_id = int(self.get_parameter("aruco_id").value)
+        self.payload_aruco_id = int(self.get_parameter("payload_aruco_id").value)
+        self.dropping_zone_aruco_id = int(
+            self.get_parameter("dropping_zone_aruco_id").value
+        )
 
         self.image_pub = self.create_publisher(Image, "/camera/image_raw", 10)
-        self.pixel_pub = self.create_publisher(PointStamped, "/aruco/pixel_center", 10)
-        self.ground_pub = self.create_publisher(
-            PointStamped, "/aruco/ground_center", 10
+        self.pixel_payload_pub = self.create_publisher(
+            PointStamped, "/aruco/payload/pixel", 10
+        )
+        self.ground_payload_pub = self.create_publisher(
+            PointStamped, "/aruco/payload/ground", 10
+        )
+        self.pixel_dropping_zone_pub = self.create_publisher(
+            PointStamped, "/aruco/dropping_zone/pixel", 10
+        )
+        self.ground_dropping_zone_pub = self.create_publisher(
+            PointStamped, "/aruco/dropping_zone/ground", 10
         )
 
         self.capture = cv2.VideoCapture(camera_index)
@@ -48,7 +60,9 @@ class Perception(Node):
 
         self.capture_timer = self.create_timer(self.CAPTURE_PERIOD, self.process_frame)
         self.get_logger().info(
-            f"Perception initialized | camera_index: {camera_index} | calibration: {camera_calibration} | homography: {homography_path} | aruco_id: {self.aruco_id}"
+            f"Perception initialized | camera_index: {camera_index}"
+            f" | calibration: {camera_calibration} | homography: {homography_path}"
+            f" | payload_aruco_id: {self.payload_aruco_id} | dropping_zone_aruco_id: {self.dropping_zone_aruco_id}"
         )
 
     def load_camera_calibration(self, calibration_path: str) -> None:
@@ -102,39 +116,47 @@ class Perception(Node):
         ids = ids.flatten()
 
         for index, marker_id in enumerate(ids):
-            if int(marker_id) != self.aruco_id:
+            if marker_id == self.payload_aruco_id:
+                pixel_pub = self.pixel_payload_pub
+                ground_pub = self.ground_payload_pub
+            elif marker_id == self.dropping_zone_aruco_id:
+                pixel_pub = self.pixel_dropping_zone_pub
+                ground_pub = self.ground_dropping_zone_pub
+            else:
                 continue
 
-            marker_corners = corners[index].reshape(4, 2)
-            center = marker_corners.mean(axis=0)
-            pixel_x, pixel_y = float(center[0]), float(center[1])
-
-            pixel_msg = PointStamped()
-            pixel_msg.header.stamp = stamp
-            pixel_msg.header.frame_id = image_msg.header.frame_id
-            pixel_msg.point.x = pixel_x
-            pixel_msg.point.y = pixel_y
-            pixel_msg.point.z = 0.0
-            self.pixel_pub.publish(pixel_msg)
+            pixel_x, pixel_y = self.get_aruco_center(corners[index])
+            self.publish_center_point(pixel_pub, pixel_x, pixel_y, stamp)
 
             if self.homography is not None:
-                pixel = np.array([[[pixel_x, pixel_y]]], dtype=np.float32)
-                ground = cv2.perspectiveTransform(pixel, self.homography).reshape(2)
-
-                ground_msg = PointStamped()
-                ground_msg.header = pixel_msg.header
-                ground_msg.point.x = float(ground[0])
-                ground_msg.point.y = float(ground[1])
-                ground_msg.point.z = 0.0
-                self.ground_pub.publish(ground_msg)
+                ground_x, ground_y = self.transform_pixel_to_ground(pixel_x, pixel_y)
+                self.publish_center_point(ground_pub, ground_x, ground_y, stamp)
 
             cv2.circle(frame, (int(pixel_x), int(pixel_y)), 5, (0, 255, 0), -1)
             cv2.imshow("Aruco Center", frame)
             cv2.waitKey(1)
 
-            break
+    def transform_pixel_to_ground(self, pixel_x, pixel_y):
+        point = np.array([[[pixel_x, pixel_y]]], dtype=np.float32)
+        transformed = cv2.perspectiveTransform(point, self.homography)
+        return float(transformed[0][0][0]), float(transformed[0][0][1])
+
+    def get_aruco_center(self, corners) -> tuple[float, float]:
+        marker_corners = corners.reshape(4, 2)
+        center = marker_corners.mean(axis=0)
+        return float(center[0]), float(center[1])
+
+    def publish_center_point(self, pub, centerx, centery, stamp):
+        pixel_msg = PointStamped()
+        pixel_msg.header.stamp = stamp
+        pixel_msg.header.frame_id = "camera_link"
+        pixel_msg.point.x = centerx
+        pixel_msg.point.y = centery
+        pixel_msg.point.z = 0.0
+        pub.publish(pixel_msg)
 
     def destroy_node(self):
+        cv2.destroyAllWindows()
         self.capture.release()
         return super().destroy_node()
 
