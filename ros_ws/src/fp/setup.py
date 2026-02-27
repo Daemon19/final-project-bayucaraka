@@ -26,9 +26,7 @@ setup(
     entry_points={
         "console_scripts": [
             "aruco_detection = fp.aruco_detection:main",
-            "camera = fp.camera:main",
-            "aruco_detector = fp.aruco_detector:main",
-            "pixel_to_ground = fp.pixel_to_ground:main",
+            "perception = fp.perception:main",
         ],
     },
 )

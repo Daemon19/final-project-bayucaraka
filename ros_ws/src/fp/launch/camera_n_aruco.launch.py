@@ -13,37 +13,15 @@ def generate_launch_description():
         "homography_path", default_value="homography_cm.npy"
     )
 
-    camera_node = Node(
+    perception_node = Node(
         package="fp",
-        executable="camera",
-        name="camera",
+        executable="perception",
+        name="perception",
         output="screen",
         parameters=[
             {
                 "camera_index": LaunchConfiguration("camera_index"),
-            }
-        ],
-    )
-
-    aruco_node = Node(
-        package="fp",
-        executable="aruco_detector",
-        name="aruco_detector",
-        output="screen",
-        parameters=[
-            {
-                "calibration_path": LaunchConfiguration("calibration_path"),
-            }
-        ],
-    )
-
-    pixel_to_ground_node = Node(
-        package="fp",
-        executable="pixel_to_ground",
-        name="pixel_to_ground",
-        output="screen",
-        parameters=[
-            {
+                "camera_calibration": LaunchConfiguration("calibration_path"),
                 "homography_path": LaunchConfiguration("homography_path"),
             }
         ],
@@ -54,8 +32,6 @@ def generate_launch_description():
             camera_index_arg,
             calibration_path_arg,
             homography_path_arg,
-            camera_node,
-            aruco_node,
-            pixel_to_ground_node,
+            perception_node,
         ]
     )
