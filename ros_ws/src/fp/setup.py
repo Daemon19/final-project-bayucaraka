@@ -25,8 +25,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "aruco_detection = fp.aruco_detection:main",
-            "perception = fp.perception:main",
+            "mission = fp.mission:main",
         ],
     },
 )
