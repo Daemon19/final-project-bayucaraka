@@ -1,6 +1,7 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch_ros.actions import Node
+from launch.substitutions import LaunchConfiguration
 
 
 def generate_launch_description():
@@ -20,11 +21,25 @@ def generate_launch_description():
         parameters=[{}],
     )
 
+    camera_node = Node(
+        package="fp",
+        executable="camera",
+        name="camera",
+        output="screen",
+        parameters=[
+            {
+                "camera_index": LaunchConfiguration("camera_index"),
+                "camera_calibration": LaunchConfiguration("calibration_path"),
+            }
+        ],
+    )
+
     return LaunchDescription(
         [
             camera_index_arg,
             calibration_path_arg,
             homography_path_arg,
             mission_node,
+            camera_node,
         ]
     )
