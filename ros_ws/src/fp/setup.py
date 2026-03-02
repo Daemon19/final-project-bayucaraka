@@ -27,6 +27,7 @@ setup(
         "console_scripts": [
             "mission = fp.mission:main",
             "camera = fp.camera:main",
+            "detector = fp.detector:main",
         ],
     },
 )

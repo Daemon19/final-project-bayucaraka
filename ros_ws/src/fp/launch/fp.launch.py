@@ -10,7 +10,7 @@ def generate_launch_description():
         "calibration_path", default_value="camera_calibration.npz"
     )
     homography_path_arg = DeclareLaunchArgument(
-        "homography_path", default_value="homography_cm.npy"
+        "homography_path", default_value="homography.npy"
     )
 
     mission_node = Node(
@@ -34,6 +34,20 @@ def generate_launch_description():
         ],
     )
 
+    detector_node = Node(
+        package="fp",
+        executable="detector",
+        name="detector",
+        output="screen",
+        parameters=[
+            {
+                "homography_path": LaunchConfiguration("homography_path"),
+                "topic_names": ["payload", "dropping_zone"],
+                "aruco_ids": [39, 26],
+            }
+        ],
+    )
+
     return LaunchDescription(
         [
             camera_index_arg,
@@ -41,5 +55,6 @@ def generate_launch_description():
             homography_path_arg,
             mission_node,
             camera_node,
+            detector_node,
         ]
     )
