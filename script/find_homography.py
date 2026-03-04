@@ -1,14 +1,7 @@
-#!/usr/bin/env python3
-
 import cv2
 import numpy as np
 import argparse
 import sys
-
-
-# ==========================================================
-# Argument Parsing
-# ==========================================================
 
 
 def parse_arguments():
@@ -45,11 +38,6 @@ def parse_arguments():
     return parser.parse_args()
 
 
-# ==========================================================
-# Camera Calibration Loading
-# ==========================================================
-
-
 def load_camera_calibration(calibration_path):
     try:
         calibration = np.load(calibration_path)
@@ -73,11 +61,6 @@ def load_camera_calibration(calibration_path):
     return K, D
 
 
-# ==========================================================
-# ArUco Detector Setup
-# ==========================================================
-
-
 def create_aruco_detector(dict_name):
     if not hasattr(cv2.aruco, dict_name):
         print("Invalid ArUco dictionary name.")
@@ -91,11 +74,6 @@ def create_aruco_detector(dict_name):
     return detector
 
 
-# ==========================================================
-# Video Source Setup
-# ==========================================================
-
-
 def open_video_source(source):
     if source.isdigit():
         cap = cv2.VideoCapture(int(source))
@@ -107,11 +85,6 @@ def open_video_source(source):
         sys.exit(1)
 
     return cap
-
-
-# ==========================================================
-# Detect Marker Center
-# ==========================================================
 
 
 def detect_marker_center(frame, detector, marker_id_filter=None):
@@ -136,22 +109,12 @@ def detect_marker_center(frame, detector, marker_id_filter=None):
     return center, frame
 
 
-# ==========================================================
-# Compute Homography
-# ==========================================================
-
-
 def compute_homography(pixel_points, ground_points):
     pixel_pts = np.array(pixel_points, dtype=np.float32)
     ground_pts = np.array(ground_points, dtype=np.float32)
 
     H, status = cv2.findHomography(pixel_pts, ground_pts)
     return H
-
-
-# ==========================================================
-# Compute Reprojection Error
-# ==========================================================
 
 
 def compute_reprojection_error(H, pixel_points, ground_points):
@@ -162,11 +125,6 @@ def compute_reprojection_error(H, pixel_points, ground_points):
     error = np.linalg.norm(projected - ground_pts, axis=1)
 
     return error, np.mean(error)
-
-
-# ==========================================================
-# Calibration Loop
-# ==========================================================
 
 
 def calibration_loop(cap, detector, K, D, marker_id_filter):
@@ -213,11 +171,6 @@ def calibration_loop(cap, detector, K, D, marker_id_filter):
     return pixel_points, ground_points
 
 
-# ==========================================================
-# Main
-# ==========================================================
-
-
 def main():
     args = parse_arguments()
 
@@ -248,8 +201,6 @@ def main():
     print(error)
     print(f"Mean error: {mean_error:.4f} cm")
 
-
-# ==========================================================
 
 if __name__ == "__main__":
     main()
