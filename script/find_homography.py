@@ -2,23 +2,16 @@ import cv2
 import numpy as np
 import argparse
 import sys
+from typing import Optional, Tuple
 
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
-        description="Pixel → Ground (cm) Homography Calibration using ArUco"
+        description="Pixel → Ground (cm) Homography Calibration using mouse clicks"
     )
 
     parser.add_argument(
         "--camera", type=str, default="0", help="Camera index or video file path"
-    )
-
-    parser.add_argument(
-        "--dict", type=str, default="DICT_4X4_50", help="ArUco dictionary name"
-    )
-
-    parser.add_argument(
-        "--marker-id", type=int, default=None, help="Use only specific marker ID"
     )
 
     parser.add_argument(
@@ -61,19 +54,6 @@ def load_camera_calibration(calibration_path):
     return K, D
 
 
-def create_aruco_detector(dict_name):
-    if not hasattr(cv2.aruco, dict_name):
-        print("Invalid ArUco dictionary name.")
-        sys.exit(1)
-
-    aruco_dict = cv2.aruco.getPredefinedDictionary(getattr(cv2.aruco, dict_name))
-
-    parameters = cv2.aruco.DetectorParameters()
-    detector = cv2.aruco.ArucoDetector(aruco_dict, parameters)
-
-    return detector
-
-
 def open_video_source(source):
     if source.isdigit():
         cap = cv2.VideoCapture(int(source))
@@ -85,28 +65,6 @@ def open_video_source(source):
         sys.exit(1)
 
     return cap
-
-
-def detect_marker_center(frame, detector, marker_id_filter=None):
-    corners, ids, _ = detector.detectMarkers(frame)
-
-    center = None
-
-    if ids is not None:
-        for i, marker_id in enumerate(ids.flatten()):
-            if marker_id_filter is not None and marker_id != marker_id_filter:
-                continue
-
-            c = corners[i][0]
-            center_x = np.mean(c[:, 0])
-            center_y = np.mean(c[:, 1])
-            center = (center_x, center_y)
-
-            cv2.aruco.drawDetectedMarkers(frame, corners, ids)
-            cv2.circle(frame, (int(center_x), int(center_y)), 6, (0, 0, 255), -1)
-            break
-
-    return center, frame
 
 
 def compute_homography(pixel_points, ground_points):
@@ -127,11 +85,20 @@ def compute_reprojection_error(H, pixel_points, ground_points):
     return error, np.mean(error)
 
 
-def calibration_loop(cap, detector, K, D, marker_id_filter):
+def calibration_loop(cap, K, D):
     pixel_points = []
     ground_points = []
+    pending_click: Optional[Tuple[float, float]] = None
 
-    print("\nSPACE → record point")
+    def on_mouse(event, x, y, flags, param):
+        nonlocal pending_click
+        if event == cv2.EVENT_LBUTTONDOWN:
+            pending_click = (float(x), float(y))
+
+    cv2.namedWindow("Calibration")
+    cv2.setMouseCallback("Calibration", on_mouse)
+
+    print("\nLeft click → record pixel point")
     print("Q → quit and compute\n")
 
     while True:
@@ -141,15 +108,17 @@ def calibration_loop(cap, detector, K, D, marker_id_filter):
 
         frame_undist = cv2.undistort(frame, K, D)
 
-        center, display = detect_marker_center(frame_undist, detector, marker_id_filter)
+        display = frame_undist.copy()
+
+        for px, py in pixel_points:
+            cv2.circle(display, (int(px), int(py)), 4, (0, 255, 0), -1)
 
         cv2.imshow("Calibration", display)
         key = cv2.waitKey(1) & 0xFF
 
-        if key == ord(" "):
-            if center is None:
-                print("No valid marker detected.")
-                continue
+        if pending_click is not None:
+            center = pending_click
+            pending_click = None
 
             print(f"\nPixel: ({center[0]:.2f}, {center[1]:.2f})")
 
@@ -176,10 +145,9 @@ def main():
 
     K, D = load_camera_calibration(args.calibration)
 
-    detector = create_aruco_detector(args.dict)
     cap = open_video_source(args.camera)
 
-    pixel_points, ground_points = calibration_loop(cap, detector, K, D, args.marker_id)
+    pixel_points, ground_points = calibration_loop(cap, K, D)
 
     cap.release()
     cv2.destroyAllWindows()
