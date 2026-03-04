@@ -38,6 +38,7 @@ class Detector(Node):
 
         self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
         self.aruco_params = cv2.aruco.DetectorParameters()
+        self.configure_aruco_params()
         self.detector = cv2.aruco.ArucoDetector(self.aruco_dict, self.aruco_params)
 
         self.get_logger().info(
@@ -48,33 +49,67 @@ class Detector(Node):
 
     def frame_callback(self, msg: Image) -> None:
         frame = cv_bridge.CvBridge().imgmsg_to_cv2(msg, desired_encoding="bgr8")
-        corners, ids, _ = self.detector.detectMarkers(frame)
-        if ids is None:
-            return
 
-        ids = ids.flatten()
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        enhanced = self.enhance_for_detection(gray)
+        cv2.imshow("Enhanced", enhanced)
+        corners, ids, _ = self.detector.detectMarkers(enhanced)
 
-        detected_ids = set()
-        for index, marker_id in enumerate(ids):
-            if marker_id not in self.topic_publishers.keys():
-                continue
-            if marker_id in detected_ids:
-                continue
-            detected_ids.add(marker_id)
+        if ids is not None:
+            ids = ids.flatten()
 
-            pixel_x, pixel_y = self.get_aruco_center(corners[index])
-            if self.homography is not None:
-                ground_x, ground_y = self.transform_pixel_to_ground(pixel_x, pixel_y)
-            else:
-                ground_x, ground_y = pixel_x, pixel_y
+            detected_ids = set()
+            for index, marker_id in enumerate(ids):
+                if marker_id not in self.topic_publishers.keys():
+                    continue
+                if marker_id in detected_ids:
+                    continue
+                detected_ids.add(marker_id)
 
-            self.publish_stamped_point(
-                self.topic_publishers[marker_id], ground_x, ground_y, msg.header.stamp
-            )
+                pixel_x, pixel_y = self.get_aruco_center(corners[index])
+                if self.homography is not None:
+                    ground_x, ground_y = self.transform_pixel_to_ground(
+                        pixel_x, pixel_y
+                    )
+                else:
+                    ground_x, ground_y = pixel_x, pixel_y
 
-            cv2.circle(frame, (int(pixel_x), int(pixel_y)), 5, (0, 255, 0), -1)
-            cv2.imshow("Aruco Center", frame)
-            cv2.waitKey(1)
+                self.publish_stamped_point(
+                    self.topic_publishers[marker_id],
+                    ground_x,
+                    ground_y,
+                    msg.header.stamp,
+                )
+
+                cv2.circle(frame, (int(pixel_x), int(pixel_y)), 5, (0, 255, 0), -1)
+
+        cv2.imshow("Aruco Center", frame)
+        cv2.waitKey(1)
+
+    def configure_aruco_params(self) -> None:
+        self.aruco_params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
+        self.aruco_params.cornerRefinementWinSize = 7
+        self.aruco_params.cornerRefinementMaxIterations = 60
+        self.aruco_params.cornerRefinementMinAccuracy = 0.01
+
+        self.aruco_params.adaptiveThreshWinSizeMin = 3
+        self.aruco_params.adaptiveThreshWinSizeMax = 53
+        self.aruco_params.adaptiveThreshWinSizeStep = 4
+        self.aruco_params.adaptiveThreshConstant = 7
+
+        self.aruco_params.minMarkerPerimeterRate = 0.02
+        self.aruco_params.maxMarkerPerimeterRate = 4.0
+        self.aruco_params.polygonalApproxAccuracyRate = 0.03
+        self.aruco_params.minCornerDistanceRate = 0.05
+        self.aruco_params.minDistanceToBorder = 3
+        self.aruco_params.errorCorrectionRate = 0.7
+
+        if hasattr(self.aruco_params, "useAruco3Detection"):
+            self.aruco_params.useAruco3Detection = True
+
+    def enhance_for_detection(self, gray_frame: np.ndarray) -> np.ndarray:
+        clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
+        return clahe.apply(gray_frame)
 
     def create_publishers(self, topic_names: list[str], aruco_ids: list[int]):
         if len(topic_names) != len(aruco_ids):
@@ -104,6 +139,8 @@ class Detector(Node):
             return None
 
     def transform_pixel_to_ground(self, pixel_x, pixel_y):
+        if self.homography is None:
+            return float(pixel_x), float(pixel_y)
         point = np.array([[[pixel_x, pixel_y]]], dtype=np.float32)
         transformed = cv2.perspectiveTransform(point, self.homography)
         return float(transformed[0][0][0]), float(transformed[0][0][1])
