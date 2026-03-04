@@ -25,6 +25,8 @@ class Camera(Node):
         self.image_publisher = self.create_publisher(Image, "/camera/image", 10)
 
         self.capture = cv2.VideoCapture(camera_index)
+        if not self.capture.isOpened():
+            raise RuntimeError(f"Failed to open camera with index {camera_index}")
         self.capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
         self.bridge = CvBridge()
