@@ -1,0 +1,2 @@
+geometry_msgs/Point payload
+geometry_msgs/Point dropping_zone

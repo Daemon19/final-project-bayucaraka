@@ -1,8 +1,8 @@
 import rclpy
 from rclpy.node import Node
 
-from geometry_msgs.msg import Point, PointStamped
-from gantry_interfaces.srv import ObjectPositions
+from geometry_msgs.msg import PointStamped
+from gantry_interfaces.msg import ObjectPositions
 
 
 class Mission(Node):
@@ -11,7 +11,7 @@ class Mission(Node):
 
         self.declare_parameter("payload_topic", "/detection/payload")
         self.declare_parameter("dropping_zone_topic", "/detection/dropping_zone")
-        self.declare_parameter("objects_service", "/object_positions")
+        self.declare_parameter("objects_topic", "/object_positions")
 
         payload_topic = str(
             self.get_parameter("payload_topic").get_parameter_value().string_value
@@ -19,8 +19,8 @@ class Mission(Node):
         dropping_zone_topic = str(
             self.get_parameter("dropping_zone_topic").get_parameter_value().string_value
         )
-        objects_service = str(
-            self.get_parameter("objects_service").get_parameter_value().string_value
+        objects_topic = str(
+            self.get_parameter("objects_topic").get_parameter_value().string_value
         )
 
         self.payload_subscriber = self.create_subscription(
@@ -35,7 +35,9 @@ class Mission(Node):
             self.dropping_zone_callback,
             10,
         )
-        self.objects_client = self.create_client(ObjectPositions, objects_service)
+        self.objects_publisher = self.create_publisher(
+            ObjectPositions, objects_topic, 10
+        )
 
         self.payload_position: tuple[float, float] | None = None
         self.dropping_zone_position: tuple[float, float] | None = None
@@ -44,6 +46,7 @@ class Mission(Node):
         self.get_logger().info(
             f"Mission initialized | payload_topic: {payload_topic}"
             f" | dropping_zone_topic: {dropping_zone_topic}"
+            f" | objects_topic: {objects_topic}"
         )
 
     def payload_callback(self, msg: PointStamped):
@@ -72,17 +75,12 @@ class Mission(Node):
         self.mission_started = True
 
         self.get_logger().info("Mission started")
-        self.objects_client.wait_for_service()
-
-        request = ObjectPositions.Request()
-        request.payload = Point()
-        request.payload.x = self.payload_position[0]
-        request.payload.y = self.payload_position[1]
-        request.dropping_zone = Point()
-        request.dropping_zone.x = self.dropping_zone_position[0]
-        request.dropping_zone.y = self.dropping_zone_position[1]
-
-        self.objects_client.call_async(request)
+        msg = ObjectPositions()
+        msg.payload.x = self.payload_position[0]
+        msg.payload.y = self.payload_position[1]
+        msg.dropping_zone.x = self.dropping_zone_position[0]
+        msg.dropping_zone.y = self.dropping_zone_position[1]
+        self.objects_publisher.publish(msg)
 
     def mission_ready(self):
         return (

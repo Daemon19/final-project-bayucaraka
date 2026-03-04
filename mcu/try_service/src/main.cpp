@@ -6,14 +6,13 @@
 #include <rclc/executor.h>
 
 #include <std_msgs/msg/int32.h>
-#include <gantry_interfaces/srv/object_positions.h>
+#include <gantry_interfaces/msg/object_positions.h>
 
 rcl_publisher_t publisher;
 std_msgs__msg__Int32 msg;
 
-rcl_service_t service;
-gantry_interfaces__srv__ObjectPositions_Request request;
-gantry_interfaces__srv__ObjectPositions_Response response;
+rcl_subscription_t object_positions_subscriber;
+gantry_interfaces__msg__ObjectPositions object_positions_msg;
 bool positions_received;
 
 rclc_executor_t executor;
@@ -61,10 +60,8 @@ void mission(float x_payload, float y_payload, float x_dropping_zone,
   }
 }
 
-void object_positions_callback(const void* request_msg, void* response_msg) {
-  const gantry_interfaces__srv__ObjectPositions_Request* req =
-      (const gantry_interfaces__srv__ObjectPositions_Request*)request_msg;
-
+void object_positions_callback(const void* msgin) {
+  RCL_UNUSED(msgin);
   positions_received = true;
 }
 
@@ -85,9 +82,9 @@ void setup() {
   RCCHECK(
       rclc_node_init_default(&node, "micro_ros_platformio_node", "", &support));
 
-  RCCHECK(rclc_service_init_default(
-      &service, &node,
-      ROSIDL_GET_SRV_TYPE_SUPPORT(gantry_interfaces, srv, ObjectPositions),
+  RCCHECK(rclc_subscription_init_default(
+      &object_positions_subscriber, &node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(gantry_interfaces, msg, ObjectPositions),
       "/object_positions"));
 
   // create publisher
@@ -103,8 +100,9 @@ void setup() {
   // create executor
   RCCHECK(rclc_executor_init(&executor, &support.context, 2, &allocator));
   RCCHECK(rclc_executor_add_timer(&executor, &timer));
-  RCCHECK(rclc_executor_add_service(&executor, &service, &request, &response,
-                                    object_positions_callback));
+  RCCHECK(rclc_executor_add_subscription(
+      &executor, &object_positions_subscriber, &object_positions_msg,
+      &object_positions_callback, ON_NEW_DATA));
 
   msg.data = 0;
   positions_received = false;
@@ -115,6 +113,8 @@ void loop() {
     delay(100);
     RCSOFTCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100)));
   }
-  mission(request.payload.x, request.payload.y, request.dropping_zone.x,
-          request.dropping_zone.y);
+  positions_received = false;
+  mission(object_positions_msg.payload.x, object_positions_msg.payload.y,
+          object_positions_msg.dropping_zone.x,
+          object_positions_msg.dropping_zone.y);
 }

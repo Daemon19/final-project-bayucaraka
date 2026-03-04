@@ -16,7 +16,7 @@ find_package(geometry_msgs REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/GantryTarget.msg"
   "msg/GantryStatus.msg"
-  "srv/ObjectPositions.srv"
+  "msg/ObjectPositions.msg"
   DEPENDENCIES geometry_msgs
 )
 

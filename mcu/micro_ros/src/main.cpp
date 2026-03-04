@@ -6,7 +6,7 @@
 #include <rclc/rclc.h>
 #include <rclc/executor.h>
 
-#include <gantry_interfaces/srv/object_positions.h>
+#include <gantry_interfaces/msg/object_positions.h>
 
 #define SERVO_NT 18
 #define SERVO_C 19
@@ -21,22 +21,21 @@
 Servo servoc;
 Servo servont;
 
-const float stepsPerRevolution = 800;
+const float stepsPerRevolution = 1600;
 const float max_x = 41.4;
 const float max_y = 45.4;
 const float min_arm_x = 8;
-const float min_arm_y = max_y - 8;
-const float max_arm_y = max_y - 8;
+const float min_arm_y = 9;
+const float max_arm_y = max_y - 9;
 const float max_revolution_x = 7;
 const float max_revolution_y = 7.275;
 const float stepsPercm_x = (stepsPerRevolution * max_revolution_x) / max_x;
 const float stepsPercm_y = (stepsPerRevolution * max_revolution_y) / max_y;
 float position_x = 0;
-float position_y = 0;
+float position_y = 9;
 
-rcl_service_t object_positions_service;
-gantry_interfaces__srv__ObjectPositions_Request object_positions_request;
-gantry_interfaces__srv__ObjectPositions_Response object_positions_response;
+rcl_subscription_t object_positions_subscriber;
+gantry_interfaces__msg__ObjectPositions object_positions_msg;
 bool positions_received;
 
 rclc_executor_t executor;
@@ -72,9 +71,8 @@ void error_loop() {
   }
 }
 
-void object_positions_callback(const void* request_msg, void* response_msg) {
-  RCL_UNUSED(request_msg);
-  RCL_UNUSED(response_msg);
+void object_positions_callback(const void* msgin) {
+  RCL_UNUSED(msgin);
   positions_received = true;
 }
 
@@ -92,15 +90,15 @@ void setup() {
   RCCHECK(
       rclc_node_init_default(&node, "micro_ros_platformio_node", "", &support));
 
-  RCCHECK(rclc_service_init_default(
-      &object_positions_service, &node,
-      ROSIDL_GET_SRV_TYPE_SUPPORT(gantry_interfaces, srv, ObjectPositions),
+  RCCHECK(rclc_subscription_init_default(
+      &object_positions_subscriber, &node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(gantry_interfaces, msg, ObjectPositions),
       "/object_positions"));
 
   RCCHECK(rclc_executor_init(&executor, &support.context, 1, &allocator));
-  RCCHECK(rclc_executor_add_service(
-      &executor, &object_positions_service, &object_positions_request,
-      &object_positions_response, object_positions_callback));
+  RCCHECK(rclc_executor_add_subscription(
+      &executor, &object_positions_subscriber, &object_positions_msg,
+      &object_positions_callback, ON_NEW_DATA));
 
   pinMode(ENABLE, OUTPUT);
   pinMode(STEPX, OUTPUT);
@@ -116,9 +114,9 @@ void setup() {
 
   servoc.attach(SERVO_C);
   servont.attach(SERVO_NT);
-  servoc.write(80);
-  servont.write(40);
-  moveToTarget(min_arm_x, min_arm_y);
+  servoc.write(85);
+  servont.write(30);
+  // moveToTarget(min_arm_x, min_arm_y);
 }
 
 void loop() {
@@ -127,38 +125,37 @@ void loop() {
     RCSOFTCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100)));
   }
 
-  mission(object_positions_request.payload.x,
-          object_positions_request.payload.y,
-          object_positions_request.dropping_zone.x,
-          object_positions_request.dropping_zone.y);
+  positions_received = false;
+
+  mission(object_positions_msg.payload.x, object_positions_msg.payload.y,
+          object_positions_msg.dropping_zone.x,
+          object_positions_msg.dropping_zone.y);
 }
 
 // ==== The code below is written with 💕 by Nofer ====
 
 void mission(float x_load, float y_load, float x_drop, float y_drop) {
   moveToTarget(x_load, y_load);
-  delayMicroseconds(500);
+  delay(3000);
   naikturun(true);
-  delayMicroseconds(500);
+  delay(3000);
   capit(true);
-  delayMicroseconds(500);
+  delay(3000);
   naikturun(false);
-  delayMicroseconds(500);
+  delay(3000);
   moveToTarget(x_drop, y_drop);
-  delayMicroseconds(500);
+  delay(3000);
   naikturun(true);
-  delayMicroseconds(500);
+  delay(3000);
   capit(false);
-  delayMicroseconds(500);
+  delay(3000);
   naikturun(false);
-  delayMicroseconds(500);
-  moveToTarget(0, 0);
-  delayMicroseconds(500);
+  delay(3000);
+  moveToTarget(0, 9);
+  delay(3000);
 }
 
 void moveToTarget(float x, float y) {
-  if (x > max_x) x = max_x;
-  if (x < min_arm_x) x = min_arm_x;
   float selisih_X = x - position_x;
   float stepsX = abs(selisih_X) * stepsPercm_x;
 
@@ -174,8 +171,6 @@ void moveToTarget(float x, float y) {
 
   position_x = x;
 
-  if (y > max_arm_y) y = max_arm_y;
-  if (y < min_arm_y) y = min_arm_y;
   float selisih_Y = y - position_y;
   float stepsY = abs(selisih_Y) * stepsPercm_y;
 
@@ -216,8 +211,8 @@ void home() {
 }
 
 void capit(bool arah) {
-  int buka = 80;
-  int tutup = 140;
+  int buka = 85;
+  int tutup = 100;
 
   if (arah) {
     for (int i = buka; i <= tutup; i++) {
