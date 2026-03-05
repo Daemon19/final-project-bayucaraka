@@ -21,18 +21,18 @@
 Servo servoc;
 Servo servont;
 
-const float stepsPerRevolution = 800;
+const float stepsPerRevolution = 1600;
 const float max_x = 41.4;
 const float max_y = 45.4;
-const float min_arm_x = 8;
-const float min_arm_y = max_y - 8;
-const float max_arm_y = max_y - 8;
+const float min_arm_x = 0;
+const float min_arm_y = 9;
+const float max_arm_y = max_y - 9;
 const float max_revolution_x = 7;
 const float max_revolution_y = 7.275;
 const float stepsPercm_x = (stepsPerRevolution * max_revolution_x) / max_x;
 const float stepsPercm_y = (stepsPerRevolution * max_revolution_y) / max_y;
 float position_x = 0;
-float position_y = 0;
+float position_y = 9;
 
 rcl_service_t object_positions_service;
 gantry_interfaces__srv__ObjectPositions_Request object_positions_request;
@@ -116,9 +116,8 @@ void setup() {
 
   servoc.attach(SERVO_C);
   servont.attach(SERVO_NT);
-  servoc.write(80);
-  servont.write(40);
-  moveToTarget(min_arm_x, min_arm_y);
+  servoc.write(100);
+  servont.write(140);
 }
 
 void loop() {
@@ -137,28 +136,26 @@ void loop() {
 
 void mission(float x_load, float y_load, float x_drop, float y_drop) {
   moveToTarget(x_load, y_load);
-  delayMicroseconds(500);
+  delay(3000);
   naikturun(true);
-  delayMicroseconds(500);
+  delay(3000);
   capit(true);
-  delayMicroseconds(500);
+  delay(3000);
   naikturun(false);
-  delayMicroseconds(500);
+  delay(3000);
   moveToTarget(x_drop, y_drop);
-  delayMicroseconds(500);
+  delay(3000);
   naikturun(true);
-  delayMicroseconds(500);
+  delay(3000);
   capit(false);
-  delayMicroseconds(500);
+  delay(3000);
   naikturun(false);
-  delayMicroseconds(500);
+  delay(3000);
   moveToTarget(0, 0);
-  delayMicroseconds(500);
+  delay(3000);
 }
 
 void moveToTarget(float x, float y) {
-  if (x > max_x) x = max_x;
-  if (x < min_arm_x) x = min_arm_x;
   float selisih_X = x - position_x;
   float stepsX = abs(selisih_X) * stepsPercm_x;
 
@@ -174,8 +171,6 @@ void moveToTarget(float x, float y) {
 
   position_x = x;
 
-  if (y > max_arm_y) y = max_arm_y;
-  if (y < min_arm_y) y = min_arm_y;
   float selisih_Y = y - position_y;
   float stepsY = abs(selisih_Y) * stepsPercm_y;
 
@@ -216,38 +211,38 @@ void home() {
 }
 
 void capit(bool arah) {
-  int buka = 80;
-  int tutup = 140;
+  int buka = 85;
+  int tutup = 100;
 
   if (arah) {
     for (int i = buka; i <= tutup; i++) {
       servoc.write(i);
-      delay(5);
+      delay(10);
     }
     delay(10);
   } else {
     for (int i = tutup; i >= buka; i--) {
       servoc.write(i);
-      delay(5);
+      delay(10);
     }
     delay(10);
   }
 }
 
 void naikturun(bool arah) {
-  int naik = 140;
-  int turun = 40;
+  int naik = 100;
+  int turun = 80;
 
   if (arah) {
     for (int i = turun; i < naik; i++) {
       servont.write(i);
-      delay(5);
+      delay(10);
     }
     delay(10);
   } else {
     for (int b = naik; b > turun; b--) {
       servont.write(b);
-      delay(5);
+      delay(10);
     }
     delay(10);
   }
